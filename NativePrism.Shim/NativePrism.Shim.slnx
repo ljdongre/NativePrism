@@ -1,0 +1,9 @@
+<Solution>
+  <Configurations>
+    <BuildType Name="Debug" />
+    <BuildType Name="Debug Dev" />
+    <BuildType Name="Release" />
+    <BuildType Name="Release Dev" />
+  </Configurations>
+  <Project Path="NativePrism.Shim.csproj" />
+</Solution>
