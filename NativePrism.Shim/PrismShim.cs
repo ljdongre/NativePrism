@@ -72,91 +72,73 @@ namespace Prism.Mvvm
 
 namespace Prism.Commands
 {
-    /// <summary>
-    /// Replacement for Prism.Commands.DelegateCommand (non-generic).
-    /// </summary>
+    // --- Non-Generic Implementation ---
     public class DelegateCommand : ICommand
     {
-        private readonly Action _executeMethod;
+        private readonly Func<Task> _executeMethod;
         private readonly Func<bool> _canExecuteMethod;
-
-        /// <summary>
-        /// Creates a new DelegateCommand.
-        /// </summary>
-        /// <param name="executeMethod">The method to execute.</param>
-        public DelegateCommand(Action executeMethod) : this(executeMethod, () => true) { }
-
-        /// <summary>
-        /// Creates a new DelegateCommand with a can-execute check.
-        /// </summary>
-        /// <param name="executeMethod">The method to execute.</param>
-        /// <param name="canExecuteMethod">The method that determines whether the command can execute.</param>
-        public DelegateCommand(Action executeMethod, Func<bool> canExecuteMethod)
+        
+        public DelegateCommand(Action executeMethod, Func<bool> canExecuteMethod = null)
+            : this(() => { executeMethod?.Invoke(); return Task.CompletedTask; }, canExecuteMethod) { }
+        
+        public DelegateCommand(Func<Task> executeMethod, Func<bool> canExecuteMethod = null)
         {
             _executeMethod = executeMethod ?? throw new ArgumentNullException(nameof(executeMethod));
-            _canExecuteMethod = canExecuteMethod ?? throw new ArgumentNullException(nameof(canExecuteMethod));
+            _canExecuteMethod = canExecuteMethod;
         }
-
-        public event EventHandler CanExecuteChanged;
-
-        public bool CanExecute(object parameter) => _canExecuteMethod();
-
-        public void Execute(object parameter) => _executeMethod();
-
-        /// <summary>
-        /// Raises CanExecuteChanged so that bound controls re-query CanExecute.
-        /// </summary>
-        public void RaiseCanExecuteChanged()
+        
+        public bool CanExecute(object parameter) => _canExecuteMethod == null || _canExecuteMethod();
+        
+        public async void Execute(object parameter) => await ExecuteAsync();
+        
+        public virtual async Task ExecuteAsync()
         {
-            CanExecuteChanged?.Invoke(this, EventArgs.Empty);
+            if (CanExecute(null)) await _executeMethod();
         }
+        
+        public event EventHandler CanExecuteChanged;
+        public void RaiseCanExecuteChanged() => CanExecuteChanged?.Invoke(this, EventArgs.Empty);
     }
 
-    /// <summary>
-    /// Replacement for Prism.Commands.DelegateCommand&lt;T&gt;.
-    /// </summary>
-    /// <typeparam name="T">The command parameter type.</typeparam>
+    // --- Generic Implementation ---
     public class DelegateCommand<T> : ICommand
     {
-        private readonly Action<T> _executeMethod;
+        private readonly Func<T, Task> _executeMethod;
         private readonly Func<T, bool> _canExecuteMethod;
-
-        /// <summary>
-        /// Creates a new DelegateCommand&lt;T&gt;.
-        /// </summary>
-        /// <param name="executeMethod">The method to execute.</param>
-        public DelegateCommand(Action<T> executeMethod) : this(executeMethod, _ => true) { }
-
-        /// <summary>
-        /// Creates a new DelegateCommand&lt;T&gt; with a can-execute check.
-        /// </summary>
-        /// <param name="executeMethod">The method to execute.</param>
-        /// <param name="canExecuteMethod">The method that determines whether the command can execute.</param>
-        public DelegateCommand(Action<T> executeMethod, Func<T, bool> canExecuteMethod)
+    
+        public DelegateCommand(Action<T> executeMethod, Func<T, bool> canExecuteMethod = null)
+            : this((t) => { executeMethod?.Invoke(t); return Task.CompletedTask; }, canExecuteMethod) { }
+    
+        public DelegateCommand(Func<T, Task> executeMethod, Func<T, bool> canExecuteMethod = null)
         {
             _executeMethod = executeMethod ?? throw new ArgumentNullException(nameof(executeMethod));
-            _canExecuteMethod = canExecuteMethod ?? throw new ArgumentNullException(nameof(canExecuteMethod));
+            _canExecuteMethod = canExecuteMethod;
         }
-
-        public event EventHandler CanExecuteChanged;
-
+    
         public bool CanExecute(object parameter)
         {
-            if (parameter == null && default(T) != null)
-                return false;
-            return _canExecuteMethod((T)parameter);
+            if (_canExecuteMethod == null) return true;
+            return _canExecuteMethod(ConvertParameter(parameter));
         }
-
-        public void Execute(object parameter) => _executeMethod((T)parameter);
-
-        /// <summary>
-        /// Raises CanExecuteChanged so that bound controls re-query CanExecute.
-        /// </summary>
-        public void RaiseCanExecuteChanged()
+    
+        public async void Execute(object parameter) => await ExecuteAsync(ConvertParameter(parameter));
+    
+        public virtual async Task ExecuteAsync(T parameter)
         {
-            CanExecuteChanged?.Invoke(this, EventArgs.Empty);
+            if (CanExecute(parameter)) await _executeMethod(parameter);
         }
+    
+        protected virtual T ConvertParameter(object parameter)
+        {
+            if (parameter == null && typeof(T).IsValueType) return default;
+            return (T)parameter;
+        }
+    
+        public event EventHandler CanExecuteChanged;
+        public void RaiseCanExecuteChanged() => CanExecuteChanged?.Invoke(this, EventArgs.Empty);
     }
+  
+
 
     /// <summary>
     /// Replacement for Prism.Commands.CompositeCommand.
